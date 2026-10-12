@@ -118,19 +118,22 @@ def test_full_build_mapping():
     assert qs[0]["options"][1]["is_correct"] and not qs[0]["options"][0]["is_correct"]
     assert qs[1]["options"][0]["is_correct"] and qs[1]["options"][2]["is_correct"]
 
-    # typed gap: U+FFFC placeholder, answers, derived Box line
+    # typed gap: U+FFFC placeholder, answers, derived Box line.
+    # v2: the authored key auto-expands (case variants) — 'goes' stays first.
     gap = next(c for c in patches if c[2] == "/drag-word-gap" and "goes" in json.dumps(c[3]))
     text = gap[3]["text"]
     assert GAP_MARK in text
     assert "[[1]]" not in text
     assert "Box:" in text and "go" in text and "goes" in text
-    assert gap[3]["gaps"][0]["answers"] == ["goes"]
+    assert gap[3]["gaps"][0]["answers"][0] == "goes"
+    assert "Goes" in gap[3]["gaps"][0]["answers"]
     assert gap[3]["gaps"][0]["correct_indices"] == [0]
 
     # short answer becomes a trailing typed gap with variant answers
     sa = [c for c in patches if c[2] == "/drag-word-gap" and c[3]["heading"] == "Q4"]
     assert len(sa) == 1
-    assert sa[0][3]["gaps"][0]["answers"] == ["50", "fifty"]
+    assert sa[0][3]["gaps"][0]["answers"][:2] == ["50", "fifty"]
+    assert "Fifty" in sa[0][3]["gaps"][0]["answers"]
     assert sa[0][3]["text"].endswith(GAP_MARK)
 
     # match pairs

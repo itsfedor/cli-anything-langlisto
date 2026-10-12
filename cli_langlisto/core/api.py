@@ -231,8 +231,9 @@ class Langlisto:
         return self.c.patch(f"/units/{uid}", {"title": title})
 
     # ---------- sections & exercises (material content) ----------
-    def unit_sections(self, uid):
-        return self.c.get(f"/units/{uid}/sections")
+    def unit_sections(self, uid, classroom_id=None):
+        params = {"classroom_id": classroom_id} if classroom_id else None
+        return self.c.get(f"/units/{uid}/sections", params=params)
 
     def section_create(self, uid):
         return self.c.post(f"/units/{uid}/sections")
@@ -292,6 +293,140 @@ class Langlisto:
             "scope": scope, "item_ids": list(item_ids), "folder_id": folder_id,
         })
 
+    # ---------- courses: modules & ordering ----------
+    def course_modules(self, cid):
+        return self.c.get(f"/courses/{cid}/modules")
+
+    def module_create(self, cid, title=""):
+        """Create a module; with a title, the empty default is renamed."""
+        m = self.c.post(f"/courses/{cid}/modules", {"title": ""})
+        if title and (m.get("title") or "") != title:
+            m = self.module_patch(m["id"], title)
+        return m
+
+    def module_patch(self, mid, title):
+        return self.c.patch(f"/course-modules/{mid}", {"title": title})
+
+    def modules_order(self, cid, module_ids):
+        return self.c.put(f"/courses/{cid}/modules/order",
+                          {"module_ids": [str(x) for x in module_ids]})
+
+    def course_lessons_order(self, cid, entries):
+        """entries: [{'id': lesson_id, 'module_id': mid|None}, …] in book order."""
+        clean = [{"id": e["id"], "module_id": e.get("module_id")} for e in entries]
+        return self.c.put(f"/courses/{cid}/lessons/order", {"lessons": clean})
+
+    def unit_delete(self, uid):
+        """DELETE a lesson unit — used for starter-lesson cleanup."""
+        return self.c.delete(f"/units/{uid}")
+
+    # ---------- section/exercise ordering ----------
+    def section_exercises_order(self, exercise_ids, classroom_id=None):
+        """Reorder exercises inside a section; position 0 = first (banner slot)."""
+        return self.c.post("/sections/exercises/order", {
+            "exercise_ids": list(exercise_ids), "classroom_id": classroom_id})
+
+    # ---------- grading trial & demo preview ----------
+    def exercise_trial_check(self, eid, answer, history=None):
+        """Grade an answer WITHOUT saving it as a student attempt (trial-check).
+
+        answer: list of answer objects, e.g. [{'question_idx':0,'option_idx':1}]
+        for test types. The response carries `attempts[].attempts[].correct`."""
+        return self.c.post(f"/exercises/{eid}/trial-check",
+                           {"answer": answer, "history": history or []})
+
+    def demo_student_open(self, next_path=None):
+        """Open the platform's built-in demo student (demoview.langlisto.com).
+
+        Returns {'url': …} — a magic-link single-use URL. Never store it."""
+        return self.c.post("/demo-student/open", {"next": next_path})
+
+    def demo_student_status(self):
+        return self.c.get("/demo-student")
+
+    # ---------- classroom membership ----------
+    def classroom_remove_student(self, cid, sid):
+        return self.c.delete(f"/classrooms/{cid}/students/{sid}")
+
     # ---------- uploads ----------
     def upload(self, filepath, kind="auto"):
         return upload_file(self.c, filepath, kind=kind)
+
+    # ---------- homework (hidden per-unit homework section) ----------
+    # Homework is keyed by the PAIR (classroom_id, unit_id): always pass
+    # classroom_id — on a material unit the management endpoints answer
+    # 400 homework_not_classroom_unit without it. All operations address
+    # SOURCE exercise ids (the ids of the unit's own exercises or of the
+    # source material); the hidden homework section then holds fresh COPIES
+    # with new ids. choose is idempotent: re-choosing an assigned exercise
+    # is a 204 no-op.
+    def unit_homework_section(self, uid, classroom_id=None):
+        """GET /units/{uid}/homework → {'section_id': …} (the hidden section)."""
+        params = {"classroom_id": classroom_id} if classroom_id else None
+        return self.c.get(f"/units/{uid}/homework", params=params)
+
+    def unit_homework_lesson_exercises(self, uid, classroom_id=None):
+        """The «Lesson» group of the picker (a unit's own exercises)."""
+        params = {"classroom_id": classroom_id} if classroom_id else None
+        return self.c.get(f"/units/{uid}/homework/lesson-exercises", params=params)
+
+    def unit_homework_workbook_exercises(self, uid, classroom_id=None):
+        """The «Exercises for homework» group (observed empty so far)."""
+        params = {"classroom_id": classroom_id} if classroom_id else None
+        return self.c.get(f"/units/{uid}/homework/workbook-exercises", params=params)
+
+    def unit_homework_assigned(self, uid, classroom_id):
+        """200 [source_exercise_id, …] — what is currently set for homework."""
+        return self.c.get(f"/units/{uid}/homework/assigned-sources",
+                          params={"classroom_id": classroom_id})
+
+    def homework_choose(self, uid, classroom_id, exercise_ids):
+        """Assign → copies the exercises into the unit's hidden hw section."""
+        return self.c.post(f"/units/{uid}/homework/choose",
+                           {"exercise_ids": [str(x) for x in exercise_ids]},
+                           params={"classroom_id": classroom_id})
+
+    def homework_unassign(self, uid, classroom_id, exercise_ids):
+        """Bulk-unassign (204)."""
+        return self.c.post(f"/units/{uid}/homework/unassign",
+                           {"exercise_ids": [str(x) for x in exercise_ids]},
+                           params={"classroom_id": classroom_id})
+
+    def homework_remove(self, uid, classroom_id, source_exercise_id):
+        """Unassign ONE exercise by its SOURCE id (DELETE → 204)."""
+        return self.c.delete(f"/units/{uid}/homework/assigned/{source_exercise_id}",
+                             params={"classroom_id": classroom_id})
+
+    def homework_submissions(self, uid, classroom_id):
+        """Teacher view: one record per student of the class."""
+        return self.c.get(f"/units/{uid}/homework/submissions",
+                          params={"classroom_id": classroom_id})
+
+    def homework_complete(self, uid, classroom_id, student_id):
+        """Accept a submission (teacher) → status 'completed'."""
+        return self.c.post(f"/units/{uid}/homework/students/{student_id}/complete",
+                           params={"classroom_id": classroom_id})
+
+    def homework_revision(self, uid, classroom_id, student_id, comment=""):
+        """Send back for revision (teacher) → status 'revision' + comment."""
+        return self.c.post(f"/units/{uid}/homework/students/{student_id}/revision",
+                           {"comment": comment},
+                           params={"classroom_id": classroom_id})
+
+    def classroom_homeworks(self, cid, student_id=None):
+        """Class's homework units: [{unit_id, has_exercises, status}].
+
+        Without student_id the platform reports status: null; pass a student
+        id for their personal statuses."""
+        params = {"student_id": student_id} if student_id else None
+        return self.c.get(f"/classrooms/{cid}/homeworks", params=params)
+
+    # ---------- section order & delete ----------
+    def unit_sections_order(self, uid, section_ids):
+        """PUT /units/{uid}/sections/order {section_ids} → 204 (order = array order)."""
+        return self.c.put(f"/units/{uid}/sections/order",
+                          {"section_ids": [str(x) for x in section_ids]})
+
+    def section_delete(self, sid):
+        """DELETE /sections/{sid} → 204 (also drops its exercises & answers)."""
+        return self.c.delete(f"/sections/{sid}")

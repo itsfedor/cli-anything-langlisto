@@ -32,6 +32,7 @@ def _guess_type(filename):
         ".jpeg": "image/jpeg",
         ".webp": "image/webp",
         ".gif": "image/gif",
+        ".pdf": "application/pdf",
     }.get(ext, "application/octet-stream")
 
 
@@ -83,3 +84,51 @@ def upload_file(client, filepath, kind="auto"):
     if not url:
         raise LanglistoError(0, "upload_failed", f"unexpected upload response: {payload!r:.200}")
     return url
+
+
+def upload_pdf(client, filepath):
+    """Upload a PDF to ``/uploads/pdf`` → ``{document_url, document_name, pages}``.
+
+    The server renders the PDF pages to jpg itself (verified 2026-10-12);
+    ``pages`` is a list of page-image URLs.  NOTE: authoring a ``pdf_document``
+    exercise on a material still lands as a note stub server-side (recon:
+    ``pdf_document`` = partial), so the returned url is meant for classroom
+    flows / future use — the material builder does not build PDF items.
+    """
+    filepath = os.path.expanduser(filepath)
+    if not os.path.exists(filepath):
+        raise LanglistoError(0, "file_not_found", f"no such file: {filepath}")
+    name = os.path.basename(filepath)
+    boundary = "----langlisto" + uuid.uuid4().hex
+    with open(filepath, "rb") as f:
+        data = f.read()
+    body = (
+        f"--{boundary}\r\n"
+        f'Content-Disposition: form-data; name="file"; filename="{name}"\r\n'
+        f"Content-Type: application/pdf\r\n\r\n"
+    ).encode("utf-8") + data + f"\r\n--{boundary}--\r\n".encode("utf-8")
+
+    req = urllib.request.Request(
+        client.BASE + "/uploads/pdf",
+        data=body,
+        method="POST",
+        headers={
+            "Authorization": f"Bearer {client.token}",
+            "Content-Type": f"multipart/form-data; boundary={boundary}",
+            "Accept": "application/json",
+            "User-Agent": client.UA,
+            "Origin": client.ORIGIN,
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=180) as r:
+            import json as _json
+
+            payload = _json.loads(r.read().decode("utf-8", "replace"))
+    except urllib.error.HTTPError as e:
+        raw = e.read().decode("utf-8", "replace")
+        raise LanglistoError(e.code, "upload_failed", raw[:300]) from None
+    payload = payload.get("data") or payload
+    if not payload.get("document_url"):
+        raise LanglistoError(0, "upload_failed", f"unexpected pdf upload response: {payload!r:.200}")
+    return payload
