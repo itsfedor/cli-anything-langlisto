@@ -1,4 +1,4 @@
-"""Entry point: python -m cli_anything.langlisto"""
+"""Entry point: python -m cli_langlisto"""
 
 from .langlisto_cli import cli
 

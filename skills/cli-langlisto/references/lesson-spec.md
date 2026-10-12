@@ -2,7 +2,7 @@
 
 A lesson spec is one JSON file that describes a whole material lesson:
 the course (book) it lives in, the lesson title, and sections of items.
-`cli-anything-langlisto materials build spec.json` maps each item onto the
+`cli-langlisto materials build spec.json` maps each item onto the
 platform's native exercise type, uploads local media, sets answer keys and
 teacher notes, and records progress in `spec.json.state.json` (resumable —
 re-run the same command to continue).

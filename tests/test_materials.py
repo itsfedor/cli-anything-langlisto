@@ -7,11 +7,11 @@ import tempfile
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from cli_anything.langlisto.core.materials import (  # noqa: E402
+from cli_langlisto.core.materials import (  # noqa: E402
     MaterialBuilder, GAP_MARK, build_material,
 )
-from cli_anything.langlisto.utils.names import translit, email_for  # noqa: E402
-from cli_anything.langlisto.utils.timeparse import parse_when  # noqa: E402
+from cli_langlisto.utils.names import translit, email_for  # noqa: E402
+from cli_langlisto.utils.timeparse import parse_when  # noqa: E402
 
 
 class FakeApi:

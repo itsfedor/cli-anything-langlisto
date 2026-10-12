@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""Render README banners (light/dark) into assets/."""
+"""Render README banners (light/dark) into this directory."""
 import asyncio
+import pathlib
 from playwright.async_api import async_playwright
 
 TPL = """
@@ -26,7 +27,7 @@ TPL = """
 </style></head><body>
   <div class="left">
     <div class="kicker">LangListo teacher workspace</div>
-    <h1>cli-anything-langlisto</h1>
+    <h1>cli-langlisto</h1>
     <div class="sub">Students, classes, schedule, materials &amp; books — from your terminal</div>
     <div class="by">unofficial · MIT · by Fedor Molodtsov</div>
   </div>
@@ -55,7 +56,7 @@ async def main():
             await pg.set_content(html)
             await pg.wait_for_timeout(250)
             el = await pg.query_selector("body")
-            path = f"/root/hermes/github-work/build/cli-anything-langlisto/assets/{name}.png"
+            path = str(pathlib.Path(__file__).resolve().parent / f"{name}.png")
             await el.screenshot(path=path)
             print("saved", path)
         await b.close()

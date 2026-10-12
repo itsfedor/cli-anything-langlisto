@@ -1,4 +1,4 @@
-"""cli-anything-langlisto — CLI for the LangListo teacher workspace.
+"""cli-langlisto — CLI for the LangListo teacher workspace.
 
 Commands: login · logout · doctor · whoami · students · classes · schedule ·
 units · courses (books) · folders · materials (build lesson specs) · raw.
@@ -94,7 +94,7 @@ def lesson_line(l):
 
 @click.group(help="Unofficial CLI for the LangListo teacher workspace.")
 @click.option("--json", "as_json", is_flag=True, help="Print machine-readable JSON.")
-@click.version_option(__version__, prog_name="cli-anything-langlisto")
+@click.version_option(__version__, prog_name="cli-langlisto")
 @click.pass_context
 def cli(ctx, as_json):
     ctx.ensure_object(dict)
@@ -650,7 +650,7 @@ def materials_tree(ctx, course):
 @click.option("--body", default=None, help="JSON body")
 @click.pass_context
 def raw(ctx, method, path, body):
-    """Raw API call: cli-anything-langlisto raw GET /classrooms"""
+    """Raw API call: cli-langlisto raw GET /classrooms"""
     jb = json.loads(body) if body else None
     a = api(ctx)
     st, d = a.c.request(method, path, json_body=jb)

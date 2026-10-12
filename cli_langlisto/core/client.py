@@ -2,7 +2,7 @@
 
 Auth model
 ----------
-* ``cli-anything-langlisto login`` posts email+password to /auth/login ONCE,
+* ``cli-langlisto login`` posts email+password to /auth/login ONCE,
   caches only the returned bearer token in ``~/.langlisto/session.json``
   (mode 600) and never stores the password.
 * Every other command reads the token from (first found wins):
@@ -61,7 +61,7 @@ def load_token():
     raise LanglistoError(
         0,
         "no_token",
-        "No session found. Run `cli-anything-langlisto login` first "
+        "No session found. Run `cli-langlisto login` first "
         "(or set LANGLISTO_TOKEN / LANGLISTO_SESSION).",
     )
 

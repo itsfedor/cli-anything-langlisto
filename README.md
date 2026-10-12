@@ -1,18 +1,20 @@
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/banner-dark.png">
-  <img alt="cli-anything-langlisto — an unofficial CLI for the LangListo teacher workspace — by Fedor Molodtsov" src="assets/banner-light.png" width="100%">
+  <img alt="cli-langlisto — an unofficial CLI for the LangListo teacher workspace — by Fedor Molodtsov" src="assets/banner-light.png" width="100%">
 </picture>
 
 <p align="center"><sub><b>Fedor Molodtsov</b> — AI automation engineer · <a href="https://github.com/itsfedor">github.com/itsfedor</a></sub></p>
 
-# ⌨️ cli-anything-langlisto: drive LangListo from your terminal
+# ⌨️ cli-langlisto: drive LangListo from your terminal
 
 **An unofficial CLI for [LangListo](https://app.langlisto.com) — the ESL teaching
 platform — with a bundled agent skill.**
 
 [![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-3776AB?logo=python&logoColor=fff)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Bundles an agent skill](https://img.shields.io/badge/bundles-agent%20skill-0075de.svg)](skills/cli-anything-langlisto/SKILL.md)
+[![Bundles an agent skill](https://img.shields.io/badge/bundles-agent%20skill-0075de.svg)](skills/cli-langlisto/SKILL.md)
+
+> **Note:** v1.1.0 renamed the project to **`cli-langlisto`** (previously `cli-anything-langlisto`). The old command name still works as an alias.
 
 LangListo keeps students, classes, the schedule and all lesson materials inside
 a Vite SPA with **no public API**. This project reverse-engineered the JSON API
@@ -28,28 +30,28 @@ materials, all rebuilt on LangListo in one evening with these exact commands.
 Requires **Python 3.9+**. No Node, no server, no extras.
 
 ```bash
-pipx install git+https://github.com/itsfedor/cli-anything-langlisto
+pipx install git+https://github.com/itsfedor/cli-langlisto
 ```
 
 Or clone + pip:
 
 ```bash
-git clone https://github.com/itsfedor/cli-anything-langlisto
-cd cli-anything-langlisto
+git clone https://github.com/itsfedor/cli-langlisto
+cd cli-langlisto
 pip install -e .
 ```
 
 Check the setup:
 
 ```bash
-cli-anything-langlisto doctor
+cli-langlisto doctor
 ```
 
 Then log in once — the session token is cached at `~/.langlisto/session.json`
 (mode 600); your password is never stored and never leaves your machine:
 
 ```bash
-cli-anything-langlisto login        # asks for email + hidden password
+cli-langlisto login        # asks for email + hidden password
 ```
 
 Non-interactive alternative for scripts:
@@ -67,11 +69,11 @@ export LANGLISTO_PASSWORD="..."
 **1 · Import students, classes and the schedule.**
 
 ```bash
-cli-anything-langlisto students add --name "Nadia"            # + --email or --domain
-cli-anything-langlisto classes create --name "Nadia — English" --kind individual \
+cli-langlisto students add --name "Nadia"            # + --email or --domain
+cli-langlisto classes create --name "Nadia — English" --kind individual \
     --student nadia@example.com
-cli-anything-langlisto schedule add --class "Nadia — English" --at "2026-11-03 14:00" --duration 60
-cli-anything-langlisto schedule list --days 3
+cli-langlisto schedule add --class "Nadia — English" --at "2026-11-03 14:00" --duration 60
+cli-langlisto schedule list --days 3
 ```
 
 Hand each student their login in one command — `students creds <name> --link`
@@ -83,21 +85,21 @@ Describe the lesson once — sections, exercises, answers, model answers, media 
 then let the CLI build it inside a course on the Materials shelf:
 
 ```bash
-cli-anything-langlisto materials build lesson.json --course "B1" --dry-run   # review the plan
-cli-anything-langlisto materials build lesson.json --course "B1"             # build (resumable)
+cli-langlisto materials build lesson.json --course "B1" --dry-run   # review the plan
+cli-langlisto materials build lesson.json --course "B1"             # build (resumable)
 ```
 
 Types: notes, articles, essays with hidden model answers, match-pairs, typed
 gaps with answer keys, quizzes (single/multi), images, audio and video —
 local media files are uploaded to the platform automatically. The spec format
-is documented in [`skills/cli-anything-langlisto/references/lesson-spec.md`](skills/cli-anything-langlisto/references/lesson-spec.md).
+is documented in [`skills/cli-langlisto/references/lesson-spec.md`](skills/cli-langlisto/references/lesson-spec.md).
 
 **3 · Design books on your shelf** — courses with covers, grouped in folders:
 
 ```bash
-cli-anything-langlisto folders create --title "My Series"
-cli-anything-langlisto courses create --title "Book A" --description-file desc.html
-cli-anything-langlisto courses cover "Book A" --file cover.png
+cli-langlisto folders create --title "My Series"
+cli-langlisto courses create --title "Book A" --description-file desc.html
+cli-langlisto courses cover "Book A" --file cover.png
 ```
 
 <p align="center">
@@ -110,13 +112,13 @@ API; `--json` makes every command scriptable.
 
 ## For AI agents
 
-The repo **bundles an agent skill** ([`skills/cli-anything-langlisto`](skills/cli-anything-langlisto/SKILL.md))
+The repo **bundles an agent skill** ([`skills/cli-langlisto`](skills/cli-langlisto/SKILL.md))
 with the command map, house rules (login is the human's step; additive-only;
 dry-run first) and troubleshooting notes. Install it with:
 
 ```bash
-npx skills add itsfedor/cli-anything-langlisto -g -y          # any SKILL.md agent
-hermes skills install itsfedor/cli-anything-langlisto/skills/cli-anything-langlisto
+npx skills add itsfedor/cli-langlisto -g -y          # any SKILL.md agent
+hermes skills install itsfedor/cli-langlisto/skills/cli-langlisto
 ```
 
 `INSTALL.md` is written for agents — paste it (or the message at its top) to

@@ -1,5 +1,5 @@
 #!/bin/sh
-# Install cli-anything-langlisto for a teacher's machine.
+# Install cli-langlisto for a teacher's machine.
 # No sudo required. Prefers uv, then pipx, then pip --user, then a private venv.
 SELF_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 SKILL_DIR=$(dirname "$SELF_DIR")
@@ -23,7 +23,7 @@ if [ -z "$PY" ]; then
   exit 1
 fi
 
-echo "Installing cli-anything-langlisto from: $WHEEL"
+echo "Installing cli-langlisto from: $WHEEL"
 ok=0
 if command -v uv >/dev/null 2>&1; then
   uv tool install --force "$WHEEL" && ok=1 || echo "uv install failed, trying pipx..."
@@ -47,18 +47,18 @@ fi
 
 echo
 CLI_BIN=""
-if [ -x "$HOME/.local/bin/cli-anything-langlisto" ]; then
-  CLI_BIN="$HOME/.local/bin/cli-anything-langlisto"
-elif command -v cli-anything-langlisto >/dev/null 2>&1; then
-  CLI_BIN="cli-anything-langlisto"
+if [ -x "$HOME/.local/bin/cli-langlisto" ]; then
+  CLI_BIN="$HOME/.local/bin/cli-langlisto"
+elif command -v cli-langlisto >/dev/null 2>&1; then
+  CLI_BIN="cli-langlisto"
 fi
 if [ -n "$CLI_BIN" ]; then
   echo "Installed. Current state:"
   "$CLI_BIN" doctor || true
   echo
   echo "Next step — run this personally in a terminal (password stays with you):"
-  echo "    cli-anything-langlisto login"
+  echo "    cli-langlisto login"
 else
-  echo "Installed, but 'cli-anything-langlisto' is not on PATH in this shell."
-  echo "Open a new terminal and run: cli-anything-langlisto doctor"
+  echo "Installed, but 'cli-langlisto' is not on PATH in this shell."
+  echo "Open a new terminal and run: cli-langlisto doctor"
 fi

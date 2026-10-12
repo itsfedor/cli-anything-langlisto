@@ -9,7 +9,7 @@ Verified against the live platform (October 2026).
 - If login times out or is rejected while the password is definitely right
   (bot protection can be touchy on some networks): sign in via the website,
   open DevTools → Application → Local Storage → `langlisto.access_token`,
-  copy the value and run `cli-anything-langlisto login --token <TOKEN>`.
+  copy the value and run `cli-langlisto login --token <TOKEN>`.
 - Token TTL is long (≈1000 days). `logout` removes the cached file.
 - Env overrides: `LANGLISTO_TOKEN`, `LANGLISTO_SESSION`, `LANGLISTO_API`,
   `LANGLISTO_EMAIL`/`LANGLISTO_PASSWORD` (scripted machines),

@@ -1,21 +1,21 @@
 ---
-name: "cli-anything-langlisto"
+name: "cli-langlisto"
 description: "Use when migrating a teacher's students, classes, schedule or lesson materials onto LangListo (app.langlisto.com) — the ESL platform — or building material lessons there programmatically."
 ---
 
-# cli-anything-langlisto
+# cli-langlisto
 
 CLI + agent workflow for the **LangListo teacher workspace** (app.langlisto.com).
 Drive students, classes, schedule, courses ("books") and lesson materials from
 the command line by your agent — for a real migration or everyday prep.
 
 Install: `sh scripts/setup.sh` (ships its own wheel) or
-`pipx install git+https://github.com/itsfedor/cli-anything-langlisto`.
+`pipx install git+https://github.com/itsfedor/cli-langlisto`.
 Docs: repo README + `references/lesson-spec.md` + `references/troubleshooting.md`.
 
 ## Hard rules
 
-1. **Login is the human's step.** The user runs `cli-anything-langlisto login`
+1. **Login is the human's step.** The user runs `cli-langlisto login`
    in their own terminal (password typed hidden, never stored; the tool caches
    only the token in `~/.langlisto/session.json`, mode 600). Never ask for or
    accept the password in chat; never paste student passwords into chat either
