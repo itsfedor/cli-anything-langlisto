@@ -550,7 +550,7 @@ def folders():
 
 
 @folders.command("list")
-@click.option("--scope", default="personal", show_default=True)
+@click.option("--scope", default="material", show_default=True, help="material (shelf) or classroom")
 @click.pass_context
 def folders_list(ctx, scope):
     items = api(ctx).folders(scope)
@@ -560,7 +560,7 @@ def folders_list(ctx, scope):
 
 @folders.command("create")
 @click.option("--title", required=True)
-@click.option("--scope", default="personal", show_default=True)
+@click.option("--scope", default="material", show_default=True, help="material (shelf) or classroom")
 @click.option("--color", default=None)
 @click.pass_context
 def folders_create(ctx, title, scope, color):
@@ -571,7 +571,7 @@ def folders_create(ctx, title, scope, color):
 @folders.command("move")
 @click.option("--folder", "folder_id", required=True, help="Target folder id")
 @click.option("--course", "course_ids", multiple=True, required=True, help="Course id (repeatable)")
-@click.option("--scope", default="personal", show_default=True)
+@click.option("--scope", default="material", show_default=True, help="material (shelf) or classroom")
 @click.pass_context
 def folders_move(ctx, folder_id, course_ids, scope):
     r = api(ctx).folder_move_items(list(course_ids), folder_id, scope=scope)

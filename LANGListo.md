@@ -19,7 +19,7 @@ behind DataDome; plain HTTP works fine once authenticated).
 | schedule | `POST /classrooms/{id}/lessons {start_at(UTC Z),duration_minutes,status,recurrence}`; `GET /classrooms/{id}/lessons?from&to`; `GET /lessons/upcoming?from&to`; `POST /lesson-conflicts`; `PATCH /lessons/{id}`; `DELETE /lessons/{id}?scope=single|series`; `GET /lesson-series/{id}` |
 | units (classroom lessons) | `GET/POST /classrooms/{id}/units`; `PATCH /units/{id} {title,cover_url?,module_id?}`; `POST /units/{id}/access {open,classroom_id}`; `PUT /classrooms/{id}/current-lesson {unit_id}` |
 | courses = books | `GET /courses`; `POST /courses {title,description,language,modules_enabled,folder_id?}`; `GET /courses/{id}`; `PATCH /courses/{id} {title,description,cover_url,...}`; `GET/POST /courses/{id}/lessons` (POST creates a new lesson/unit); `DELETE /courses/{id}` |
-| folders | `GET /folders?scope=personal`; `POST /folders {scope,title,color,parent_id}`; `PATCH /folders/{id}`; `DELETE /folders/{id}?scope=`; `POST /folders/items {scope,item_ids,folder_id}` (move courses/boards into a folder); `POST /folders/reorder` |
+| folders | `GET /folders?scope=material` (scopes: `material` for the shelf, `classroom`); `POST /folders {scope,title,color}` — do NOT send `parent_id: null` (422); `PATCH /folders/{id}`; `DELETE /folders/{id}?scope=`; `POST /folders/items {scope,item_ids,folder_id}` (move courses/boards into a folder); `POST /folders/reorder` |
 | materials content | `GET/POST /units/{id}/sections`; `PATCH /sections/{id} {title}`; `GET/POST /sections/{id}/exercises`; `GET /exercises/{id}`; per-type `PATCH /exercises/{id}/<suffix>`; `DELETE /exercises/{id}` |
 | uploads | multipart `POST /uploads/image` (pictures), `POST /uploads/media` (audio/video), field name `file` → `{url}`; also `/uploads/pdf`, `/uploads/direct`, `/uploads/media/chunked` |
 | misc | `/config`; `/notifications`; `/shared-materials/{token}`; `/billing/*`; `/move/jobs` ("paste links" importer) |
@@ -49,6 +49,8 @@ Teacher notes: `PUT /exercises/{id}/teacher-notes {notes:[{text,visible_to_stude
 
 ## Platform quirks (verified)
 
+- Folders take a `scope` of exactly `material` or `classroom` (other values →
+  422); on create, omit `parent_id` entirely rather than sending `null`.
 - Word-bank placements (`/drag-word-gap/placements`) reject on materials:
   `answer_scope` — "Answers only exist inside a classroom lesson." Use typed
   gaps there; the dropdown flavor becomes configurable only inside a class.

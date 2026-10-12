@@ -274,15 +274,18 @@ class Langlisto:
         })
 
     # ---------- folders ----------
-    def folders(self, scope="personal"):
+    # scope: "material" (the Materials shelf) or "classroom". POST with
+    # parent_id=null fails validation — omit it instead.
+    def folders(self, scope="material"):
         return self.c.get("/folders", params={"scope": scope})
 
-    def folder_create(self, title, scope="personal", color=None, parent_id=None):
-        return self.c.post("/folders", {
-            "scope": scope, "title": title, "color": color, "parent_id": parent_id,
-        })
+    def folder_create(self, title, scope="material", color=None, parent_id=None):
+        body = {"scope": scope, "title": title, "color": color or "neutral"}
+        if parent_id:
+            body["parent_id"] = parent_id
+        return self.c.post("/folders", body)
 
-    def folder_move_items(self, item_ids, folder_id, scope="personal"):
+    def folder_move_items(self, item_ids, folder_id, scope="material"):
         return self.c.post("/folders/items", {
             "scope": scope, "item_ids": list(item_ids), "folder_id": folder_id,
         })
