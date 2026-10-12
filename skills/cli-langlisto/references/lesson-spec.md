@@ -37,6 +37,7 @@ copy, basic HTML: `<b> <i> <br> <p> <ul> <table>`).
 | `short_answer` | `correct`: `["variant", ...]`, `number` | typed gap after the prompt |
 | `choice` | `options: [...]`, `correct: 0` | quiz question (single answer) |
 | `multi_choice` | `options: [...]`, `correct: [0, 2]` | quiz question (multiple answers) |
+| `true_false` | `statements`: `[{text, answer: "true"/"false"/"not_stated"}]`, `not_stated_enabled` (optional) | True/False quiz; `not_stated` answers need the flag |
 
 Consecutive `choice`/`multi_choice` items are automatically grouped into ONE
 quiz exercise (in original order). Everything else becomes its own exercise.
@@ -77,7 +78,8 @@ platform's own storage and the returned URL is saved into the state file.
   dropdown "word bank" flavor to be configured inside a live classroom, not in
   materials — so specs carry a `"Box: …"` hint line derived from `options`.
 - Video/audio items require the media URL to be stored with a clip entry; the
-  builder does this correctly (empty clip lists silently drop the URL).
+  builder does this correctly (empty clip lists silently drop the URL). YouTube
+  links become an embedded player on the lesson page.
 - Answers on materials are stored with `correct_indices: [0]` per gap; that is
   the canonical shape the platform expects for typed gaps.
 - Re-running a build NEVER duplicates: already-created sections/exercises are

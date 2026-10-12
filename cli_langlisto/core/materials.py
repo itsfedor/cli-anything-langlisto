@@ -239,6 +239,12 @@ class MaterialBuilder:
                                      {"heading": "", "description": ph, "media_url": url or "",
                                       "clips": [{"media_url": url or "", "title": "", "script": "",
                                                  "keep_source_player": True}]})
+            elif media.get("video_url"):
+                url = self._resolve_media(media["video_url"])
+                self.create_exercise(sec_id, key, ["media_clip", "video", "audio"], "/media-clip",
+                                     {"heading": "", "description": ph, "media_url": url or "",
+                                      "clips": [{"media_url": url or "", "title": "", "script": "",
+                                                 "keep_source_player": True}]})
             elif media.get("image"):
                 url = self._resolve_media(media["image"])
                 self.create_exercise(sec_id, key, ["image_stack"], "/image-block",
@@ -265,8 +271,12 @@ class MaterialBuilder:
                                  {"heading": item.get("heading", ""), "description": ph,
                                   "time_limit_seconds": item.get("time_limit_seconds") or 180})
         elif t == "true_false":
-            sts = [{"text": s.get("text", ""),
-                    "answer": "true" if (s.get("answer") is True or str(s.get("answer")).lower() == "true") else "false"}
+            def _tf(v):
+                sv = str(v).strip().lower()
+                if sv in ("not_stated", "notstated", "not stated"):
+                    return "not_stated"
+                return "true" if (v is True or sv == "true") else "false"
+            sts = [{"text": s.get("text", ""), "answer": _tf(s.get("answer"))}
                    for s in item.get("statements") or []]
             self.create_exercise(sec_id, key, ["true_false"], "/true-false",
                                  {"heading": item.get("heading", ""),
