@@ -262,7 +262,14 @@ class MaterialBuilder:
                     break
             if hit:
                 self.state["lesson_id"] = hit["id"]
-                self.log(f"= lesson exists: {self.lesson_title} ({hit['id'][:8]})")
+                try:
+                    _secs = self.api.unit_sections(hit["id"]) or []
+                except Exception:
+                    _secs = []
+                self.log(f"= lesson exists: {self.lesson_title} ({hit['id'][:8]}) — adopting it"
+                         + (f"; it already has {len(_secs)} sections — if another spec shares "
+                            "this lesson title you will get duplicated sections; keep lesson "
+                            "titles unique" if _secs else ""))
             else:
                 l = self._api_retry(self.api.course_add_lesson, cid)
                 self._sleep()
@@ -414,6 +421,13 @@ class MaterialBuilder:
                                       "media_url": url or "",
                                       "clips": [{"media_url": url or "", "title": "",
                                                  "script": "", "keep_source_player": True}]})
+            elif media.get("video_url"):
+                url = self._resolve_media(media["video_url"])
+                self.create_exercise(sec_id, key, ["media_clip", "video", "audio"], "/media-clip",
+                                     {"heading": item.get("heading", ""), "description": ph,
+                                      "media_url": url or "",
+                                      "clips": [{"media_url": url or "", "title": "",
+                                                 "script": "", "keep_source_player": True}]})
             elif media.get("image"):
                 url = self._resolve_media(media["image"])
                 self.create_exercise(sec_id, key, ["image_stack"], "/image-block",
@@ -438,8 +452,12 @@ class MaterialBuilder:
                                  {"heading": item.get("heading", ""), "description": ph,
                                   "time_limit_seconds": item.get("time_limit_seconds") or 180})
         elif t == "true_false":
-            sts = [{"text": s.get("text", ""),
-                    "answer": "true" if (s.get("answer") is True or str(s.get("answer")).lower() == "true") else "false"}
+            def _tf(v):
+                sv = str(v).strip().lower()
+                if sv in ("not_stated", "notstated", "not stated"):
+                    return "not_stated"
+                return "true" if (v is True or sv == "true") else "false"
+            sts = [{"text": s.get("text", ""), "answer": _tf(s.get("answer"))}
                    for s in item.get("statements") or []]
             self.create_exercise(sec_id, key, ["true_false"], "/true-false",
                                  {"heading": item.get("heading", ""),
@@ -656,7 +674,8 @@ class MaterialBuilder:
                         t = item["type"]
                         m = item.get("media") or {}
                         if t == "info":
-                            label = "image" if m.get("image") else ("audio" if m.get("audio") else "note/article")
+                            label = ("image" if m.get("image") else ("audio" if m.get("audio")
+                                     else ("video" if m.get("video_url") else "note/article")))
                         else:
                             label = DRY_LABELS.get(t, t)
                         extra = ""
@@ -664,6 +683,8 @@ class MaterialBuilder:
                             extra = f" [audio {m['audio']}]"
                         elif m.get("image"):
                             extra = f" [img {m['image']}]"
+                        elif m.get("video_url"):
+                            extra = f" [video {m['video_url']}]"
                         elif item.get("teacher_note"):
                             extra = " [note]"
                         self._plan(f"    - {label:<22} {_short(item.get('prompt_html') or item.get('description'))}{extra}")

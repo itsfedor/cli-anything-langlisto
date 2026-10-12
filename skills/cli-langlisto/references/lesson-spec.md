@@ -25,6 +25,10 @@ the original 11 plus `sort_columns`, the ordering family, the word-image trio,
 ```
 
 - `lesson_title` — the lesson (unit) name; created if missing in the course.
+  Keep it **unique within a course**: when the state file is missing, a build
+  ADOPTS an existing lesson with the same title (crash recovery) — so two specs
+  sharing one title silently merge into a single lesson with duplicated
+  sections. Disambiguate sibling variants, e.g. `"... (B1+)"`.
 - `course` — course title or id (a book on the Materials shelf; created if
   missing). `--course` on the CLI overrides it.
 - `lesson_description` — optional, PLAIN TEXT (the platform renders it
@@ -39,7 +43,7 @@ copy, basic HTML: `<b> <i> <br> <p> <table>`).
 
 | type | extra fields | becomes on the platform |
 |---|---|---|
-| `info` | `media`: `{image, audio, caption?}` | short text → note; long text → article; image → image block; audio URL → media player |
+| `info` | `media`: `{image, audio, video_url, caption?}` | short text → note; long text → article; image → image block; audio/video URL → media player |
 | `open` | `model_answer` (optional) | essay prompt; the model answer lands in hidden teacher notes |
 | `match` | `left`: `[{id, html}]`, `correct`: `{id: text}` | match-pairs exercise |
 | `gap_text` | `gaps`: `{"1": {answer\|correct, options?, hint?, no_correct?, sample_answer?}}` with `[[1]]` markers | typed gaps (a "Box: …" line is derived from `options`) |
@@ -47,7 +51,7 @@ copy, basic HTML: `<b> <i> <br> <p> <table>`).
 | `choice` | `options: [...]`, `correct: 0` | quiz question (single answer) |
 | `multi_choice` | `options: [...]`, `correct: [0, 2]` | quiz question (multiple answers) |
 | `voice` | `heading`, `prompt_html`, `time_limit_seconds?`, `model_answer?` | voice recording; model answer → teacher note |
-| `true_false` | `statements: [{text, answer}]`, `not_stated_enabled?` | true/false |
+| `true_false` | `statements`: `[{text, answer: "true"/"false"/"not_stated"}]`, `not_stated_enabled` (optional) | true/false quiz; `not_stated` answers need the flag |
 | `test` | `questions: [{prompt, options: [str], correct: [idx]}]` | one multi-question quiz |
 
 Consecutive `choice`/`multi_choice` items are automatically grouped into ONE
@@ -76,7 +80,7 @@ quiz exercise (in original order). Everything else becomes its own exercise.
 
 Notes:
 
-- `image` / `audio` / `video_url` / `image` values accept a public URL OR a
+- `image` / `audio` / `video_url` values accept a public URL OR a
   local path (absolute, or relative to the spec file / `--media-dir`); local
   files are uploaded to the platform's CDN and the URL is stored in state.
 - Coordinates (`x`, `y`, `time_seconds`) are numbers as the platform expects;
@@ -206,12 +210,17 @@ builder appends a derived `<p><b>Box:</b> a · b</p>` line. The linter's
 - Gap exercises are built as **typed** gaps; the derived `Box:` line is the
   canonical hint for a word bank on materials (see the H2 note above).
 - Video/audio items require the media URL to be stored with a clip entry; the
-  builder does this correctly (empty clip lists silently drop the URL).
+  builder does this correctly (empty clip lists silently drop the URL). YouTube
+  links become an embedded player on the lesson page.
 - Answers on materials are stored with `correct_indices: [0]` per gap; that is
   the canonical shape the platform expects for typed gaps.
 - Re-running a build NEVER duplicates: already-created sections/exercises are
   looked up in the state file and skipped. To rebuild one item, remove its id
   from the state file first (or delete the exercise in the platform UI).
+- A build whose state file is missing but whose `lesson_title` already exists
+  in the course will ADOPT that lesson and append its own sections to it
+  (safe for crash resumes — but if two specs share a title you get duplicated
+  sections; the build log prints an "adopting it" note). Keep titles unique.
 - `divider` is created without a PATCH (it has no content); the QA verifier
   flags it as "unknown type" because it cannot judge an empty item — that is a
   verifier limitation, not a build fault.

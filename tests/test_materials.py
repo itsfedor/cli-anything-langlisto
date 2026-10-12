@@ -54,6 +54,9 @@ class FakeApi:
     def upload(self, path, kind="auto"):
         return "https://cdn.example/" + os.path.basename(path)
 
+    def unit_sections(self, uid):
+        return []
+
 
 SPEC = {
     "lesson_title": "Smoke lesson",
@@ -184,3 +187,53 @@ def test_media_upload_dry_and_wet():
         r2 = build_material(api2, spec, state_path=os.path.join(d, "st.json"), pace=0,
                             spec_dir=d, log=lambda *_: None)
     assert any("media not found" in w for w in r2["warnings"])
+
+
+def test_info_video_url_builds_media_player():
+    spec = {"lesson_title": "V", "course": "B1", "sections": [
+        {"id": "s", "title": "Watch", "items": [
+            {"id": "k-video", "type": "info", "prompt_html": "Watch the video.",
+             "media": {"video_url": "https://www.youtube.com/watch?v=abc12345678"}}]}]}
+    api = FakeApi()
+    with tempfile.TemporaryDirectory() as d:
+        res = build_material(api, spec, state_path=os.path.join(d, "st.json"),
+                             pace=0, spec_dir=d, log=lambda *_: None)
+    assert res["warnings"] == []
+    mp = next(c for c in api.calls if c[0] == "patch" and c[2] == "/media-clip")
+    body = mp[3]
+    assert body["media_url"] == "https://www.youtube.com/watch?v=abc12345678"
+    # the clip entry is what keeps the URL on the platform (empty clips drop it)
+    assert body["clips"][0]["keep_source_player"] is True
+
+
+def test_true_false_not_stated_answers():
+    spec = {"lesson_title": "TF", "course": "B1", "sections": [
+        {"id": "s", "title": "Practice", "items": [
+            {"id": "tf", "type": "true_false", "heading": "Mark the statements.",
+             "not_stated_enabled": True,
+             "statements": [
+                 {"text": "A", "answer": True},
+                 {"text": "B", "answer": "false"},
+                 {"text": "C", "answer": "not_stated"}]}]}]}
+    api = FakeApi()
+    with tempfile.TemporaryDirectory() as d:
+        res = build_material(api, spec, state_path=os.path.join(d, "st.json"),
+                             pace=0, spec_dir=d, log=lambda *_: None)
+    assert res["warnings"] == []
+    tf = next(c for c in api.calls if c[0] == "patch" and c[2] == "/true-false")
+    body = tf[3]
+    assert [s["answer"] for s in body["statements"]] == ["true", "false", "not_stated"]
+    assert body["not_stated_enabled"] is True
+
+
+def test_adoption_of_existing_title_logs_warning():
+    api = FakeApi()
+    api.course_lessons = lambda cid: [{"id": "lesson-9", "title": "Smoke lesson"}]
+    api.unit_sections = lambda uid: [{"id": "sec-a"}, {"id": "sec-b"}]
+    logs = []
+    with tempfile.TemporaryDirectory() as d:
+        res = build_material(api, SPEC, state_path=os.path.join(d, "st.json"), pace=0,
+                             spec_dir=d, log=logs.append)
+    assert res["exercises"] > 0
+    joined = " ".join(logs)
+    assert "adopting" in joined and "2 sections" in joined

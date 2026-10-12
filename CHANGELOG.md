@@ -21,7 +21,13 @@ show|delete|notes|order|patch`; `books modules | lessons order | purge-starter`;
 `sections list|reorder|delete`; `units cover set|clear`;
 `students patch|unenroll|verify`.
 
-**QA.** 62 offline tests; full surface live-verified on a 27-type showcase lesson.
+**QA.** 65 offline tests; full surface live-verified on a 27-type showcase lesson.
+
+**Upstream fixes folded in (v1.1.1/v1.1.2).** `info` items with `media.video_url`
+build a media player (YouTube links embed as a player) instead of falling back
+to a note; `true_false` answers accept `"not_stated"` (pairs with
+`not_stated_enabled`); and a build that adopts an existing same-title lesson now
+reports how many sections it already has and warns to keep lesson titles unique.
 
 **Earlier.** v1.1.0 renamed the project to `cli-langlisto` (old
 `cli-anything-langlisto` command kept as an alias); v1.0.x added teacher notes
