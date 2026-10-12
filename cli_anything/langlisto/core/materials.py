@@ -186,6 +186,17 @@ class MaterialBuilder:
         self.log(f"  + {key}")
         return ex["id"]
 
+    def attach_note(self, exid, item, key):
+        """Teacher note (student-invisible) for ANY exercise type."""
+        note = item.get("teacher_note")
+        if not note or not exid:
+            return
+        try:
+            self.api.exercise_teacher_notes(exid, note)
+        except LanglistoError as e:
+            self._warn(f"{key}: teacher note failed: {e.message}")
+        self._sleep()
+
     def gap_body(self, item):
         text = item["prompt_html"]
         gaps = []
@@ -240,6 +251,18 @@ class MaterialBuilder:
                 except LanglistoError as e:
                     self._warn(f"{key}: teacher notes failed: {e.message}")
                 self._sleep()
+        elif t == "voice":
+            self.create_exercise(sec_id, key, ["voice_recording"], "/voice-recording",
+                                 {"heading": item.get("heading", ""), "description": ph,
+                                  "time_limit_seconds": item.get("time_limit_seconds") or 180})
+        elif t == "true_false":
+            sts = [{"text": s.get("text", ""),
+                    "answer": "true" if (s.get("answer") is True or str(s.get("answer")).lower() == "true") else "false"}
+                   for s in item.get("statements") or []]
+            self.create_exercise(sec_id, key, ["true_false"], "/true-false",
+                                 {"heading": item.get("heading", ""),
+                                  "not_stated_enabled": bool(item.get("not_stated_enabled", False)),
+                                  "statements": sts})
         elif t == "match":
             pairs = [{"left": l.get("html", ""), "right": item["correct"][l["id"]], "audio_url": ""}
                      for l in item.get("left") or []]
@@ -271,8 +294,12 @@ class MaterialBuilder:
                      "is_correct": (k in correct) if isinstance(correct, list) else (k == correct)}
                     for k, o in enumerate(c.get("options") or [])]
             qs.append({"prompt": c.get("prompt_html") or "", "options": opts})
-        self.create_exercise(sec_id, f"test-{run[0]['id']}", ["untimed_test", "timed_test"],
+        key = f"test-{run[0]['id']}"
+        self.create_exercise(sec_id, key, ["untimed_test", "timed_test"],
                              "/test", {"heading": "", "time_limit_seconds": None, "questions": qs})
+        notes = [c.get("teacher_note") for c in run if c.get("teacher_note")]
+        if notes:
+            self.attach_note(self.state["exercises"].get(key), {"teacher_note": "<br>".join(notes)}, key)
 
     # ------------------------------------------------ driver
     def run(self):
@@ -297,7 +324,8 @@ class MaterialBuilder:
                         label = {"open": "essay (+model answer if any)",
                                  "match": "match pairs", "gap_text": "gaps (typed)",
                                  "short_answer": "short answer", "choice": "quiz (grouped)",
-                                 "multi_choice": "quiz (grouped)"}.get(t, t)
+                                 "multi_choice": "quiz (grouped)", "voice": "voice task",
+                                 "true_false": "true/false"}.get(t, t)
                     extra = ""
                     if m.get("audio"):
                         extra = f" [audio {m['audio']}]"
@@ -306,6 +334,8 @@ class MaterialBuilder:
                     self._plan(f"    - {label:<22} {_short(item.get('prompt_html'))}{extra}")
                 try:
                     res = self.build_item(sec_id, item)
+                    if res != "choice":
+                        self.attach_note(self.state["exercises"].get(item.get("id")), item, item.get("id"))
                     if res == "choice":
                         run = []
                         j = i
