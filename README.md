@@ -101,7 +101,8 @@ cli-anything-langlisto courses cover "Book A" --file cover.png
 ```
 
 <p align="center">
-  <img src="assets/preview.png" alt="Materials shelf with book courses" width="80%" />
+  <img src="assets/preview.png" alt="Materials shelf: book courses with covers" width="49%" />
+  <img src="assets/preview-books.png" alt="A book series with its covers inside a folder" width="49%" />
 </p>
 
 **4 · Anything else** — `raw METHOD /path` is an escape hatch to the whole
