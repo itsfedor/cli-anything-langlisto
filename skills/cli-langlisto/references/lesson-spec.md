@@ -35,6 +35,12 @@ the original 11 plus `sort_columns`, the ordering family, the word-image trio,
   `pre-line`; HTML tags would show as code — the linter warns).
 - `sections[].id` — your stable id (used for resume); `title` is shown to
   students.
+- `sections[].homework` — optional flag. A section marked `"homework": true`
+  is **not created as a regular section**: its items are authored into the
+  unit's *workbook-section* — the editor's «Exercises for homework» bucket
+  students never see in the lesson flow (they appear only once you assign
+  them). `title` is ignored for such a section; there is exactly ONE bucket
+  per unit, so flag at most one section.
 
 ## Items — v1 vocabulary
 
@@ -88,6 +94,32 @@ Notes:
 - Every item of every type may carry `teacher_note` (student-invisible).
 - `heading` is supported on all types; give new types a heading — the QA
   verifier uses it to judge "content present".
+
+## Homework sections (the workbook bucket)
+
+Flag one section of the spec with `"homework": true` to author the lesson's
+homework. Its items are built into the unit's **workbook-section** — the
+editor's «Exercises for homework» bucket ("Prepare the homework exercises
+for this lesson here. Students only see them once you assign them as
+homework"). No regular section is created, no title is set, and the items
+stay out of the lesson flow: they do not appear in the unit's section list
+nor in `…/homework/lesson-exercises`.
+
+- The builder fetches the bucket with `GET /units/{unitId}/workbook-section`
+  (get-or-create) after the lesson exists; the state file records the routing
+  per spec section as `{"kind": "workbook", "section_id": …}` — re-runs stay
+  idempotent.
+- Dry-run plans show the section as `(homework bucket)`.
+- The bucket is per-unit and invisible to students until assigned. Assign it
+  in the classroom room with `homework choose` (picker group «Exercises for
+  homework» = `GET /units/{id}/homework/workbook-exercises`), preview the
+  bucket with `homework bucket --unit <uid>`.
+- Migrating a lesson that still keeps homework as a visible section (the
+  OLD model): `homework prepare --unit <uid> --section Homework` moves the
+  whole section into the bucket and deletes the emptied section (see
+  `references/homework.md`).
+- One flagged section per spec; a second one would build into the same
+  bucket (harmless but confusing — the state keys stay separate).
 
 ## Quality features
 
@@ -200,6 +232,12 @@ builder appends a derived `<p><b>Box:</b> a · b</p>` line. The linter's
        "words": [{"text": "pillow", "column": 0}, {"text": "key card", "column": 1}]},
       {"id": "p4", "type": "timed_test", "heading": "Speed quiz", "time_limit_seconds": 90,
        "questions": [{"prompt": "2+2=?", "options": ["3", "4"], "correct": 1}]}
+    ]},
+    {"id": "hw", "homework": true, "items": [
+      {"id": "h1", "type": "short_answer", "number": 1, "prompt_html": "Where did you stay?",
+       "correct": ["At a hotel."]},
+      {"id": "h2", "type": "voice", "heading": "Record", "prompt_html": "Tell about your stay.",
+       "time_limit_seconds": 90}
     ]}
   ]
 }

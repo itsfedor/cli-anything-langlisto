@@ -54,7 +54,7 @@ Docs: repo README + `references/lesson-spec.md` + `references/homework.md` +
 - `folders list | create --title ... | move --folder ID --course COURSE_ID...`
 - `materials build SPEC.json [--course T] [--dry-run] [--pace N]` — build/resume a lesson; `materials verify COURSE [--lesson L] [--min-note-coverage N] [--state f] [--strict] [--grading]` — the LIVE quality gate (read-only; exit 1 on problems); `materials run SPECS [--state f] [--only slug] [--retry-failed]` — mass-run a catalog, resumable; `materials status --state f.json ...` — run-state summary; `materials tree COURSE` — lessons → sections → exercises (with types).
 - `exercises show ID | notes ID --text ... [--visible-to-student|--from-file f] | order --section SID --ids a,b,c | patch ID --suffix note --body-file f.json | delete ID`
-- `homework list --class ... [--student ...] | available --class ... --unit ... [--from-material MU] | choose --class ... --unit ... --exercise SRC... [--dry-run] | assigned | show | remove | clear | review | accept | return --comment ...` — the room's «Homework» tab; exercises by SOURCE id, every call keyed by (classroom, unit).
+- `homework bucket --unit UID | prepare --unit UID --section S [--class C] [--keep-section]` — homework AUTHORING: list the unit's workbook bucket («Exercises for homework») / move a whole regular section into it (afterwards the emptied section is DELETED unless `--keep-section` — cascades to students' answers). `homework list --class ... [--student ...] | available --class ... --unit ... [--from-material MU] | choose --class ... --unit ... --exercise SRC... [--dry-run] | assigned | show | remove | clear | review | accept | return --comment ...` — the room's «Homework» tab; exercises by SOURCE id, every call keyed by (classroom, unit).
 - `preview open [--class C] [--unit U] [--tab lesson|homework]` — demo-student (student view) magic-link URL; single-use, never stored.
 - `raw METHOD /path [--body '{...}']` — escape hatch.
 - Global `--json` before the subcommand for machine output.
@@ -85,8 +85,10 @@ quality gate — run it before students see the lesson.
 ## Files
 
 - `references/lesson-spec.md` — the lesson JSON schema the builder consumes
-  (v2 vocabulary: 18 extra types, quality features, lint rules).
-- `references/homework.md` — the classroom homework model (choose / remove /
-  accept / return, source ids vs copy ids).
+  (v2 vocabulary: 18 extra types, quality features, lint rules; homework
+  sections via `"homework": true` → the unit's workbook bucket).
+- `references/homework.md` — homework authoring (workbook bucket «Exercises
+  for homework», `homework prepare`) + the classroom homework model
+  (choose / remove / accept / return, source ids vs copy ids).
 - `references/troubleshooting.md` — login quirks, pacing, timezones, media,
   known platform limits.

@@ -7,6 +7,7 @@ import tempfile
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from cli_langlisto.core.client import LanglistoError  # noqa: E402
 from cli_langlisto.core.materials import (  # noqa: E402
     MaterialBuilder, GAP_MARK, build_material,
 )
@@ -42,6 +43,7 @@ class FakeApi:
 
     def exercise_create(self, sid, ctype):
         self._n += 1
+        self.calls.append(("exercise", sid, f"ex-{self._n}"))
         return {"id": f"ex-{self._n}", "type": ctype}
 
     def exercise_patch(self, eid, suffix, body):
@@ -56,6 +58,11 @@ class FakeApi:
 
     def unit_sections(self, uid):
         return []
+
+    def unit_workbook_section(self, uid):
+        """The unit's «Exercises for homework» bucket (get-or-create)."""
+        self.calls.append(("workbook_section", uid))
+        return {"id": "wb-sec", "unit_id": uid, "position": 5, "title": None}
 
 
 SPEC = {
@@ -237,3 +244,100 @@ def test_adoption_of_existing_title_logs_warning():
     assert res["exercises"] > 0
     joined = " ".join(logs)
     assert "adopting" in joined and "2 sections" in joined
+
+
+# ----------------------------------------------- homework bucket routing (v2)
+
+HW_SPEC = {
+    "lesson_title": "Homework bucket lesson",
+    "course": "B1",
+    "sections": [
+        {"id": "warm", "title": "Warm-Up", "items": [
+            {"id": "w1", "type": "info", "prompt_html": "Read this first."}]},
+        {"id": "hw", "title": "Homework", "homework": True, "items": [
+            {"id": "h1", "type": "info", "prompt_html": "Homework reading."},
+            {"id": "h2", "type": "open", "prompt_html": "Write about your day.",
+             "model_answer": "sample"}]},
+    ],
+}
+
+
+def run_hw_build(api, state_path, spec=HW_SPEC, dry_run=False):
+    return build_material(api, spec, state_path=state_path, dry_run=dry_run,
+                          pace=0, spec_dir=".", log=lambda *_: None)
+
+
+def test_homework_section_routes_into_workbook_bucket():
+    """`"homework": true` creates NO regular section — items go into the unit's
+    workbook-section («Exercises for homework»); state records kind=workbook."""
+    api = FakeApi()
+    with tempfile.TemporaryDirectory() as d:
+        state = os.path.join(d, "hw.state.json")
+        res = run_hw_build(api, state)
+        assert res["warnings"] == [], res["warnings"]
+        st = json.load(open(state))
+    # only the regular section was created/renamed; the homework one was not
+    assert [c for c in api.calls if c[0] == "section_title"] == [
+        ("section_title", "sec-1", "Warm-Up")]
+    assert ("workbook_section", "lesson-1") in api.calls
+    creates = [c for c in api.calls if c[0] == "exercise"]
+    assert [c[2] for c in creates] == ["ex-2", "ex-3", "ex-4"]  # warm + 2 homework
+    assert creates[0][1] == "sec-1"                    # warm-up item stays regular
+    assert all(c[1] == "wb-sec" for c in creates[1:])  # homework items → bucket
+    assert st["sections"]["warm"] == "sec-1"
+    assert st["sections"]["hw"] == {"kind": "workbook", "section_id": "wb-sec"}
+
+
+def test_homework_bucket_dry_run_plan_and_no_writes():
+    api = FakeApi()
+    res = run_hw_build(api, None, dry_run=True)
+    assert api.calls == []                             # dry run: zero API calls
+    plan = "\n".join(res["plan"])
+    assert "(homework bucket)" in plan
+    assert "section 'Warm-Up'" in plan
+
+
+def test_homework_bucket_resume_is_idempotent():
+    api = FakeApi()
+    with tempfile.TemporaryDirectory() as d:
+        state = os.path.join(d, "hw.state.json")
+        run_hw_build(api, state)
+        api2 = FakeApi()
+        res2 = run_hw_build(api2, state)
+        assert res2["warnings"] == [], res2["warnings"]
+    stale = [c for c in api2.calls
+             if c[0] in ("exercise", "section_title", "workbook_section", "patch")]
+    assert stale == []                                 # nothing recreated, no re-fetch
+
+
+def test_homework_bucket_fetch_failure_skips_items_safely():
+    api = FakeApi()
+
+    def boom(uid):
+        raise LanglistoError(404, "not_found", "no workbook section")
+
+    api.unit_workbook_section = boom
+    with tempfile.TemporaryDirectory() as d:
+        res = run_hw_build(api, os.path.join(d, "hw.state.json"))
+    assert any("workbook-section fetch failed" in w for w in res["warnings"])
+    creates = [c for c in api.calls if c[0] == "exercise"]
+    assert len(creates) == 1 and creates[0][1] == "sec-1"  # regular section intact
+
+
+def test_homework_flag_added_later_warns_and_keeps_recorded_section():
+    """A spec flipped to `"homework": true` while its state still records a
+    regular section keeps that section and warns (no silent bucket routing)."""
+    plain = {"lesson_title": "Flip lesson", "course": "B1", "sections": [
+        {"id": "hw", "title": "Homework", "items": [
+            {"id": "h1", "type": "info", "prompt_html": "Reading."}]}]}
+    flip = {"lesson_title": "Flip lesson", "course": "B1", "sections": [
+        {"id": "hw", "title": "Homework", "homework": True, "items": [
+            {"id": "h1", "type": "info", "prompt_html": "Reading."}]}]}
+    api = FakeApi()
+    with tempfile.TemporaryDirectory() as d:
+        state = os.path.join(d, "f.state.json")
+        run_hw_build(api, state, spec=plain)
+        api2 = FakeApi()
+        res2 = run_hw_build(api2, state, spec=flip)
+    assert any("spec marks it homework" in w for w in res2["warnings"])
+    assert ("workbook_section", "lesson-1") not in api2.calls

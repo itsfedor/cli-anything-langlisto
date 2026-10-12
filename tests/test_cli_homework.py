@@ -48,6 +48,8 @@ class HWApi:
              "cover_url": None},
         ]
         self.hw_sec = {"u-room": "hw-sec"}
+        self.workbook = {}             # unit → prepared bucket items
+        self.wb_moves = []             # (dest_section_id, ids) — move-to-section calls
         self.lesson_ex = {
             "u-room": [
                 {"id": "e-note", "type": "note",
@@ -118,7 +120,29 @@ class HWApi:
 
     def unit_homework_workbook_exercises(self, uid, classroom_id=None):
         self.hw_calls.append(("workbook", uid, classroom_id))
-        return []
+        return [dict(x) for x in self.workbook.get(uid, [])]
+
+    def unit_workbook_section(self, uid):
+        """The unit's «Exercises for homework» bucket (get-or-create)."""
+        self.hw_calls.append(("workbook_section", uid, None))
+        return {"id": "wb-sec", "unit_id": uid, "position": 9, "title": None}
+
+    def exercises_move_to_section(self, dest_section_id, exercise_ids):
+        self.wb_moves.append((dest_section_id, list(exercise_ids)))
+        moved, skipped = 0, 0
+        for eid in exercise_ids:
+            hit = None
+            for lst in self.copies.values():
+                hit = next((e for e in lst if e["id"] == eid), None)
+                if hit:
+                    lst.remove(hit)
+                    break
+            if hit:
+                self.workbook.setdefault("u-room", []).append(hit)
+                moved += 1
+            else:
+                skipped += 1
+        return {"moved": moved, "skipped": skipped}
 
     def unit_homework_assigned(self, uid, classroom_id=None):
         self.hw_calls.append(("assigned", uid, classroom_id))
@@ -402,6 +426,105 @@ def test_every_homework_call_carries_classroom_id():
     assert all(c[1] == "cl-1" for c in api.log if c[0] == "classroom_homeworks")
 
 
+# ------------------------------------------- homework bucket prepare / bucket
+def _hw_api_with_section():
+    api = HWApi()
+    api.sections["u-room"] = [{"id": "s-1", "title": "A", "position": 1},
+                              {"id": "s-hw", "title": "Homework", "position": 2}]
+    api.copies["s-hw"] = [
+        {"id": "e-hw1", "type": "note", "position": 0},
+        {"id": "e-hw2", "type": "enter_word_gap", "position": 1},
+    ]
+    return api
+
+
+def test_homework_prepare_moves_section_then_deletes_it():
+    api = _hw_api_with_section()
+    r = run(["--json", "homework", "prepare", "--unit", "CLI Lab room lesson",
+             "--class", "cl-1", "--section", "Homework"], api)
+    assert r.exit_code == 0, out_of(r)
+    d = json.loads(r.output)
+    assert d["section_id"] == "s-hw" and d["section_title"] == "Homework"
+    assert d["workbook_section_id"] == "wb-sec"
+    assert d["total"] == 2 and d["moved"] == 2 and d["skipped"] == 0
+    assert d["readback_missing"] == [] and d["confirmed"] is True
+    assert d["section_deleted"] is True and d["section_remaining"] == 0
+    assert api.wb_moves == [("wb-sec", ["e-hw1", "e-hw2"])]
+    assert api.section_deleted == ["s-hw"]
+    assert "s-hw" not in [s["id"] for s in api.sections["u-room"]]
+    assert [w["id"] for w in api.workbook["u-room"]] == ["e-hw1", "e-hw2"]
+
+
+def test_homework_prepare_by_section_id_and_rerun_finds_nothing():
+    api = _hw_api_with_section()
+    r = run(["--json", "homework", "prepare", "--unit", "u-room", "--class", "cl-1",
+             "--section", "s-hw"], api)
+    assert r.exit_code == 0, out_of(r)
+    assert json.loads(r.output)["section_deleted"] is True
+    # re-run: the section is gone → clean usage error, nothing written
+    r2 = run(["homework", "prepare", "--unit", "u-room", "--class", "cl-1",
+              "--section", "s-hw"], api)
+    assert r2.exit_code == 2
+    assert len(api.wb_moves) == 1
+
+
+def test_homework_prepare_skips_delete_on_move_failure():
+    api = _hw_api_with_section()
+
+    def half(dest, ids):
+        api.wb_moves.append((dest, list(ids)))
+        e = api.copies["s-hw"][0]                      # only the first one moves
+        api.copies["s-hw"].remove(e)
+        api.workbook.setdefault("u-room", []).append(e)
+        return {"moved": 1, "skipped": 1}
+
+    api.exercises_move_to_section = half
+    r = run(["--json", "homework", "prepare", "--unit", "u-room", "--class", "cl-1",
+             "--section", "Homework"], api)
+    assert r.exit_code == 1, out_of(r)
+    d = json.loads(r.output)
+    assert d["moved"] == 1 and d["skipped"] == 1
+    assert d["readback_missing"] == ["e-hw2"]
+    assert d["section_deleted"] is False and d["confirmed"] is False
+    assert api.section_deleted == []                   # NOT deleted after a failure
+    assert "s-hw" in [s["id"] for s in api.sections["u-room"]]
+
+
+def test_homework_prepare_keep_section():
+    api = _hw_api_with_section()
+    r = run(["--json", "homework", "prepare", "--unit", "u-room", "--class", "cl-1",
+             "--section", "Homework", "--keep-section"], api)
+    assert r.exit_code == 0, out_of(r)
+    d = json.loads(r.output)
+    assert d["keep_section"] is True and d["section_deleted"] is False
+    assert d["confirmed"] is True and d["moved"] == 2
+    assert api.section_deleted == []
+    assert "s-hw" in [s["id"] for s in api.sections["u-room"]]
+
+
+def test_homework_prepare_unit_title_needs_class():
+    api = _hw_api_with_section()
+    r = run(["homework", "prepare", "--unit", "CLI Lab room lesson", "--section", "Homework"], api)
+    assert r.exit_code == 2
+    assert "class" in out_of(r)
+    assert api.wb_moves == []
+
+
+def test_homework_bucket_lists_prepared_items():
+    api = HWApi()
+    api.workbook["u-room"] = [
+        {"id": "wb1", "type": "note", "label": "1", "heading": ""},
+        {"id": "wb2", "type": "enter_word_gap", "label": "2", "heading": "Gap"},
+    ]
+    r = run(["--json", "homework", "bucket", "--unit", "u-room"], api)
+    assert r.exit_code == 0, out_of(r)
+    d = json.loads(r.output)
+    assert d["count"] == 2 and [x["id"] for x in d["workbook"]] == ["wb1", "wb2"]
+    assert ("workbook", "u-room", None) in api.hw_calls   # bare read — no classroom_id
+    r = run(["homework", "bucket", "--unit", "u-empty"], api)
+    assert r.exit_code == 0 and "empty" in r.output
+
+
 # ---------------------------------------------------------------- preview open
 def test_preview_open_class_room_deep_links():
     api = HWApi()
@@ -528,6 +651,8 @@ def test_api_methods_wire_shapes_against_fake_client():
     a.unit_sections_order("u1", ["sec-2", "sec-1"])
     a.section_delete("sec-9")
     a.unit_patch("u1", cover_url="")
+    a.unit_workbook_section("u1")
+    a.exercises_move_to_section("sec-wb", ["e1", "e2"])
     calls = c.calls
     assert calls[0] == ("GET", "/units/u1/homework", None, {"classroom_id": "cid-1"})
     assert calls[1] == ("GET", "/units/u1/homework/lesson-exercises", None,
@@ -549,6 +674,9 @@ def test_api_methods_wire_shapes_against_fake_client():
                         {"section_ids": ["sec-2", "sec-1"]}, None)
     assert calls[10] == ("DELETE", "/sections/sec-9", None, None)
     assert calls[11] == ("PATCH", "/units/u1", {"cover_url": ""}, None)
+    assert calls[12] == ("GET", "/units/u1/workbook-section", None, None)
+    assert calls[13] == ("POST", "/exercises/move-to-section",
+                         {"dest_section_id": "sec-wb", "exercise_ids": ["e1", "e2"]}, None)
     # without classroom_id the material-unit path is *not* taken silently:
     # params are simply omitted (the platform then answers 400) — never a wrong id
     c.calls.clear()

@@ -1315,14 +1315,144 @@ def preview_open(ctx, next_path, klass, unit_ref, tab):
 def homework():
     """Homework of a class's units — the hidden per-unit homework section.
 
-    Feels like the room's «Homework» tab: everything is keyed by the pair
-    (classroom, unit) and EVERY call carries classroom_id — on a material
-    unit the management endpoints answer 400 `homework_not_classroom_unit`
-    without it. Exercises are addressed by their SOURCE ids (the ids you see
-    in the lesson / material) — never by the copy ids inside the homework
-    section (those are what `show` displays). `choose` is idempotent: re-choosing
-    an assigned exercise is a no-op; the visible «Homework» section of a book
-    lesson stays canonical for the student."""
+    Homework CONTENT is authored in the unit's workbook bucket («Exercises for
+    homework», `bucket` / `prepare`): a section of the lesson spec flagged
+    `"homework": true`, or `homework prepare` for existing lessons. Only when
+    you assign it (`choose`) does it reach students. The room's «Homework» tab
+    feels like this group: everything is keyed by the pair (classroom, unit)
+    and EVERY call carries classroom_id — on a material unit the management
+    endpoints answer 400 `homework_not_classroom_unit` without it. Exercises
+    are addressed by their SOURCE ids (the ids you see in the lesson /
+    material) — never by the copy ids inside the homework section (those are
+    what `show` displays). `choose` is idempotent: re-choosing an assigned
+    exercise is a no-op; students see the homework only once assigned."""
+
+
+@homework.command("bucket")
+@click.option("--unit", "unit_id", required=True, help="Unit id")
+@click.pass_context
+def homework_bucket(ctx, unit_id):
+    """List the unit's prepared homework bucket («Exercises for homework»).
+
+    Reads GET /units/{unit}/homework/workbook-exercises — the exercises
+    prepared in the unit's workbook-section. They never show in the lesson
+    flow and stay invisible to students until assigned (`homework choose`)."""
+    a = api(ctx)
+    items = a.unit_homework_workbook_exercises(unit_id) or []
+    data = {"unit_id": unit_id, "count": len(items), "workbook": items}
+    lines = [f"workbook bucket of unit {unit_id} — {len(items)} exercise(s):"]
+    for x in items:
+        label = " ".join(p for p in (x.get("label"), x.get("heading")) if p)
+        lines.append(f"  · {x.get('id')}  [{x.get('type')}] {label}")
+    if not items:
+        lines.append("  (empty — prepare homework with `homework prepare`, or build a "
+                     "spec section flagged \"homework\": true)")
+    out(ctx, data, "\n".join(lines))
+
+
+@homework.command("prepare")
+@click.option("--unit", "unit_ref", required=True,
+              help="Unit id (a title needs --class to resolve)")
+@click.option("--class", "klass", default=None,
+              help="Class name or id — resolves --unit by title")
+@click.option("--section", "section_ref", required=True,
+              help="Section id or title to move into the workbook bucket (e.g. Homework)")
+@click.option("--keep-section", is_flag=True,
+              help="Keep the emptied section. WARNING: without this flag the section is "
+                   "DELETED — that also drops the students' answers on its exercises.")
+@click.pass_context
+def homework_prepare(ctx, unit_ref, klass, section_ref, keep_section):
+    """Prepare homework: move a whole section into the unit's workbook bucket.
+
+    The workbook bucket («Exercises for homework», GET /units/{uid}/workbook-section)
+    is where homework content belongs — students never see it in the lesson
+    flow; it becomes visible only once assigned (`homework choose`). This moves
+    ALL exercises of the given regular section into the bucket
+    (POST /exercises/move-to-section), reads the bucket back
+    (GET …/homework/workbook-exercises) and — unless --keep-section — deletes
+    the emptied section. Deletion cascades: the section's exercises and any
+    student answers on them are dropped; nothing is deleted when the move or
+    the read-back failed."""
+    a = api(ctx)
+    cid = find_class(a, klass)["id"] if klass else None
+    ref = str(unit_ref).strip()
+    if cid:
+        u = find_unit(a, cid, unit_ref)
+    elif len(ref) >= 32:
+        u = {"id": ref, "title": None}
+    else:
+        err("a unit title needs --class to resolve (or pass the unit id)")
+    uid = u["id"]
+
+    secs = sorted(a.unit_sections(uid, classroom_id=cid) or [],
+                  key=lambda s: s.get("position") or 0)
+    n = str(section_ref).strip().lower()
+    hit = [s for s in secs if str(s.get("id")) == str(section_ref)
+           or (s.get("title") or "").strip().lower() == n]
+    if len(hit) == 1:
+        sec = hit[0]
+    elif len(hit) > 1:
+        err(f"ambiguous section {section_ref!r}: "
+            + ", ".join(f"{s['id']} ({s.get('title')})" for s in hit))
+    else:
+        part = [s for s in secs if n and n in (s.get("title") or "").lower()]
+        if len(part) != 1:
+            err(f"section not found in unit {uid}: {section_ref!r}. Sections: "
+                + ", ".join(f"{s.get('title') or '(untitled)'} [{s.get('id')}]" for s in secs))
+        sec = part[0]
+    sid = sec["id"]
+
+    ids = [str(e.get("id")) for e in (a.section_exercises(sid) or []) if e.get("id")]
+    dest = None
+    moved = skipped = 0
+    if ids:
+        ws = a.unit_workbook_section(uid) or {}
+        dest = ws.get("id") or ws.get("section_id")
+        if not dest:
+            err(f"no workbook-section id in the response: {ws!r}")
+        batch = 100
+        for i in range(0, len(ids), batch):
+            res = a.exercises_move_to_section(dest, ids[i:i + batch]) or {}
+            moved += int(res.get("moved") or 0)
+            skipped += int(res.get("skipped") or 0)
+            if i + batch < len(ids):
+                time.sleep(1.0)  # be a gentle client on multi-batch moves
+    wb_items = a.unit_homework_workbook_exercises(uid, classroom_id=cid) or []
+    wb_ids = {str(x.get("id")) for x in wb_items}
+    missing = [i for i in ids if i not in wb_ids]
+    remaining = a.section_exercises(sid) or []
+    ok = (skipped == 0 and not missing)
+    deleted = False
+    if not keep_section:
+        if not remaining and ok:
+            a.section_delete(sid)
+            secs2 = a.unit_sections(uid, classroom_id=cid) or []
+            deleted = all(str(s.get("id")) != sid for s in secs2)
+            if not deleted:
+                ok = False
+        else:
+            ok = False
+    data = {"classroom_id": cid, "unit_id": uid, "section_id": sid,
+            "section_title": sec.get("title"), "workbook_section_id": dest,
+            "total": len(ids), "moved": moved, "skipped": skipped, "moved_ids": ids,
+            "workbook_count": len(wb_items), "readback_missing": missing,
+            "keep_section": keep_section, "section_deleted": deleted,
+            "section_remaining": len(remaining), "confirmed": ok}
+    lines = [f"{'✓' if ok else '⚠'} homework prepare on unit {uid}: moved {moved}/{len(ids)} "
+             f"exercise(s) from {sec.get('title') or sid!r} to the workbook bucket"
+             + (f" ({dest})" if dest else " (no exercises — nothing to move)")]
+    lines.append(f"  read-back: workbook-exercises holds {len(wb_items)} item(s)"
+                 + (f" — missing: {missing}" if missing else " — all moved ids present"))
+    if keep_section:
+        lines.append(f"= section kept (--keep-section; {len(remaining)} item(s) still in it)")
+    elif deleted:
+        lines.append(f"✓ section {sid} deleted (students' answers on it are gone)")
+    else:
+        lines.append(f"⚠ section {sid} NOT deleted ({len(remaining)} item(s) still in it "
+                     f"or a failure — kept for safety)")
+    out(ctx, data, "\n".join(lines))
+    if not ok:
+        sys.exit(1)
 
 
 @homework.command("list")

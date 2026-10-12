@@ -91,7 +91,9 @@ cli-langlisto materials build lesson.json --course "B1"             # build (res
 
 Types: notes, articles, essays with hidden model answers, match-pairs, typed
 gaps with answer keys, quizzes (single/multi), images, audio and video —
-local media files are uploaded to the platform automatically. The spec format
+local media files are uploaded to the platform automatically. Flag a section
+`"homework": true` and its items are authored into the unit's homework bucket
+(«Exercises for homework») instead of a visible section. The spec format
 is documented in [`skills/cli-langlisto/references/lesson-spec.md`](skills/cli-langlisto/references/lesson-spec.md).
 
 **3 · Design books on your shelf** — courses with covers, grouped in folders:
@@ -177,6 +179,8 @@ fastest way to see exactly what a student's Homework tab shows.
 **9 · Classroom homework — the room's «Homework» tab from the CLI.**
 
 ```bash
+cli-langlisto homework bucket --unit <uid>                            # prepared homework («Exercises for homework»)
+cli-langlisto homework prepare --unit <uid> --section Homework        # migrate a visible section; deletes it!
 cli-langlisto homework list --class "Nadia — English"                 # units with homework
 cli-langlisto homework list --class "CLI Lab (test)" --student "Demo Student"  # personal statuses
 cli-langlisto homework available --class <cid> --unit <uid>           # Lesson + workbook groups
@@ -191,6 +195,14 @@ cli-langlisto homework review --class <cid> --unit <uid>              # submissi
 cli-langlisto homework accept --class <cid> --unit <uid> --student <sid>
 cli-langlisto homework return --class <cid> --unit <uid> --student <sid> --comment "Fix Q2"
 ```
+
+Homework content is authored into the unit's **workbook bucket** — the
+editor's «Exercises for homework» group; students only see it once assigned.
+`homework bucket` lists what is prepared; `homework prepare` migrates a lesson
+that keeps homework in a visible section (moves the whole section into the
+bucket and deletes the emptied one — cascading to the students' answers on it
+— unless `--keep-section`). Building a material flags the same routing with a
+spec section `"homework": true`.
 
 The room's «Homework» tab is the hidden per-unit homework section: `choose`
 **copies** the selected exercises there and the student gets a separate
@@ -255,11 +267,12 @@ A quiet pace between calls keeps bulk operations friendly to the platform.
 - **Additive by design** — destructive commands are explicit and few:
   `schedule rm` (lessons you explicitly want removed), `exercises delete`,
   `books purge-starter` (untitled + empty starter lessons only),
-  `students unenroll` (membership link only — the account survives) and
-  `sections delete` (drops the section's exercises and students' answers).
-  Homework writes are reversible: `homework choose` copies exercises into the
-  unit's hidden homework section, `remove` / `clear` take them out by source
-  id; `accept` / `return` only set the review status.
+  `students unenroll` (membership link only — the account survives),
+  `sections delete` and `homework prepare` without `--keep-section` (both
+  drop a section's exercises and students' answers). Other homework writes
+  are reversible: `homework choose` copies exercises into the unit's hidden
+  homework section, `remove` / `clear` take them out by source id; `accept` /
+  `return` only set the review status.
 - `materials verify` is **read-only** unless you pass `--grading` (which only
   sends trial checks — never student-visible attempts). What fails it:
   empty content, missing answers, render-lint hazards, duplicate

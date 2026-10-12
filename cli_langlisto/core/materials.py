@@ -25,7 +25,11 @@ V2 additions
 * quality features — per-gap hints, auto-expanded answer variants
   (``core.variants``), free gaps with teacher-note samples, teacher notes on
   every type, image captions, a build lockfile + duplicate detector
-  (``core.dedup``) and a render-safe pre-build lint gate (``core.spec_lint``).
+  (``core.dedup``) and a render-safe pre-build lint gate (``core.spec_lint``);
+* homework authoring — a spec section flagged ``"homework": true`` routes its
+  items into the unit's workbook-section («Exercises for homework»): no regular
+  section is created and students only see the content once it is assigned.
+  (`homework prepare` migrates existing visible Homework sections the same way.)
 """
 
 import json
@@ -291,10 +295,38 @@ class MaterialBuilder:
     def ensure_section(self, section):
         key = section["id"]
         if self.dry_run:
-            self._plan(f"  section {section.get('title', '')!r} ({len(section['items'])} items)")
+            if section.get("homework"):
+                self._plan(f"  section {section.get('title', '')!r} (homework bucket)"
+                           f" — {len(section['items'])} items")
+            else:
+                self._plan(f"  section {section.get('title', '')!r} ({len(section['items'])} items)")
             return None
         if key in self.state["sections"]:
-            return self.state["sections"][key]
+            val = self.state["sections"][key]
+            if section.get("homework") and isinstance(val, str):
+                self._warn(f"section {key!r}: state records a regular section ({val[:8]}) but the "
+                           f"spec marks it homework — keeping the recorded section; re-run with a "
+                           f"fresh state file (or delete the state entry) to route into the "
+                           f"workbook bucket")
+            return self._section_id(val)
+        if section.get("homework"):
+            # Homework content lives in the unit's WORKBOOK bucket («Exercises for
+            # homework»): route the section's items there, create no regular
+            # section and set no title. The endpoint is get-or-create.
+            try:
+                ws = self._api_retry(self.api.unit_workbook_section, self.state["lesson_id"])
+            except LanglistoError as e:
+                self._warn(f"section {key!r}: workbook-section fetch failed: {e.message}")
+                return None
+            sec_id = self._section_id(ws)
+            if not sec_id:
+                self._warn(f"section {key!r}: workbook-section response has no id: {ws!r}")
+                return None
+            self.state["sections"][key] = {"kind": "workbook", "section_id": sec_id}
+            self._save()
+            self.log(f"+ homework bucket: «Exercises for homework» "
+                     f"({str(sec_id)[:8]}) — items go to the unit workbook-section")
+            return sec_id
         sec = self._api_retry(self.api.section_create, self.state["lesson_id"])
         self._sleep()
         if section.get("title"):
@@ -304,6 +336,16 @@ class MaterialBuilder:
         self._save()
         self.log(f"+ section: {section.get('title', '(untitled)')}")
         return sec["id"]
+
+    @staticmethod
+    def _section_id(value):
+        """State value for a spec section → platform section id.
+
+        Regular sections record a bare id string; homework sections record
+        ``{"kind": "workbook", "section_id": …}`` (resume stays idempotent)."""
+        if isinstance(value, dict):
+            return value.get("section_id") or value.get("id")
+        return value
 
     # ------------------------------------------------ exercises
     def create_exercise(self, sec_id, key, ctypes, suffix, body):
@@ -666,6 +708,10 @@ class MaterialBuilder:
                 return self.summary()
             for section in self.spec.get("sections") or []:
                 sec_id = self.ensure_section(section)
+                if sec_id is None and not self.dry_run:
+                    self._warn(f"section {section.get('id')!r}: no platform section "
+                               f"(workbook-section fetch failed or no id) — items skipped")
+                    continue
                 items = section.get("items") or []
                 i = 0
                 while i < len(items):

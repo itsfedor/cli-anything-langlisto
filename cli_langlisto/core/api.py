@@ -371,9 +371,31 @@ class Langlisto:
         return self.c.get(f"/units/{uid}/homework/lesson-exercises", params=params)
 
     def unit_homework_workbook_exercises(self, uid, classroom_id=None):
-        """The «Exercises for homework» group (observed empty so far)."""
+        """The picker group «Exercises for homework» — the unit's prepared
+        homework bucket (the exercises sitting in its workbook-section)."""
         params = {"classroom_id": classroom_id} if classroom_id else None
         return self.c.get(f"/units/{uid}/homework/workbook-exercises", params=params)
+
+    def unit_workbook_section(self, uid):
+        """GET /units/{uid}/workbook-section → the «Exercises for homework»
+        bucket section ({id, title: null, position, unit_id}).
+
+        This is the AUTHORING home of homework exercises: content moved here
+        leaves the lesson flow (the unit's regular sections) and stays
+        invisible to students until assigned (`homework choose`). The endpoint
+        behaves get-or-create (returns the same section on every call —
+        verified live 2026-10-13)."""
+        return self.c.get(f"/units/{uid}/workbook-section")
+
+    def exercises_move_to_section(self, dest_section_id, exercise_ids):
+        """POST /exercises/move-to-section → {"moved": N, "skipped": M}.
+
+        Moves exercises between sections of ONE unit (used to prepare the
+        homework bucket; verified live)."""
+        return self.c.post("/exercises/move-to-section", {
+            "dest_section_id": str(dest_section_id),
+            "exercise_ids": [str(x) for x in exercise_ids],
+        })
 
     def unit_homework_assigned(self, uid, classroom_id):
         """200 [source_exercise_id, …] — what is currently set for homework."""

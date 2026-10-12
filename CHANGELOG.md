@@ -14,14 +14,27 @@ free gaps with sample answers; teacher notes on ALL exercise types; image
 captions via `media.caption`; duplicate guard (normalized section/item
 hashes); render spec-lint gate.
 
+**Homework model correction.** Homework exercises are authored into the unit's
+**workbook-section** — the editor's «Exercises for homework» bucket
+("Students only see them once you assign them as homework"): invisible in the
+lesson flow and to students until assigned. A spec section flagged
+`"homework": true` now routes its items there (state records `kind: workbook`;
+no regular section is created, no title is set; dry-run shows «(homework
+bucket)»). New CLI: `homework bucket` (list the prepared bucket) and
+`homework prepare --unit U --section S` (migrate a legacy lesson whose
+homework sits in a visible section: move the whole section into the bucket,
+then delete the emptied section unless `--keep-section` — the deletion
+cascades to the students' answers; nothing is deleted when the move or the
+read-back failed). The visible-«Homework»-section model is legacy.
+
 **CLI.** `materials verify | run | status | tree`; `exercises
 show|delete|notes|order|patch`; `books modules | lessons order | purge-starter`;
-`homework list|show|available|assigned|choose|remove|clear|review|accept|return`;
+`homework bucket|prepare|list|show|available|assigned|choose|remove|clear|review|accept|return`;
 `preview open` (platform demo-student view, `--class/--unit/--tab`);
 `sections list|reorder|delete`; `units cover set|clear`;
 `students patch|unenroll|verify`.
 
-**QA.** 65 offline tests; full surface live-verified on a 27-type showcase lesson.
+**QA.** 76 offline tests; full surface live-verified on a 27-type showcase lesson.
 
 **Upstream fixes folded in (v1.1.1/v1.1.2).** `info` items with `media.video_url`
 build a media player (YouTube links embed as a player) instead of falling back
