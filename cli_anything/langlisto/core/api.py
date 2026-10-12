@@ -179,7 +179,7 @@ class Langlisto:
     def unit_create(self, cid):
         return self.c.post(f"/classrooms/{cid}/units")
 
-    def unit_patch(self, uid, title=None, module_id=None, cover_url=None):
+    def unit_patch(self, uid, title=None, module_id=None, cover_url=None, description=None):
         body = {}
         if title is not None:
             body["title"] = title
@@ -187,6 +187,8 @@ class Langlisto:
             body["module_id"] = module_id
         if cover_url is not None:
             body["cover_url"] = cover_url
+        if description is not None:
+            body["description"] = description
         return self.c.patch(f"/units/{uid}", body)
 
     def unit_access(self, uid, cid, open_=True):

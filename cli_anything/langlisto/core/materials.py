@@ -142,6 +142,15 @@ class MaterialBuilder:
                 self.state["lesson_id"] = l["id"]
                 self.log(f"+ lesson created: {self.lesson_title} ({l['id'][:8]})")
             self._save()
+        # lesson description (plain text; the platform renders it pre-line)
+        desc = self.spec.get("lesson_description")
+        if desc and not self.state.get("lesson_desc_set"):
+            try:
+                self.api.unit_patch(self.state["lesson_id"], description=desc)
+                self.state["lesson_desc_set"] = True
+                self._save()
+            except LanglistoError as e:
+                self._warn(f"lesson description: {e.message}")
         return self.state["course_id"], self.state["lesson_id"]
 
     def ensure_section(self, section):
@@ -263,6 +272,25 @@ class MaterialBuilder:
                                  {"heading": item.get("heading", ""),
                                   "not_stated_enabled": bool(item.get("not_stated_enabled", False)),
                                   "statements": sts})
+        elif t == "test":
+            # explicit multi-question test: {heading, questions:[{prompt, options:[str], correct:[idx]}]}
+            qs = []
+            for q in item.get("questions") or []:
+                opts = q.get("options") or []
+                correct = q.get("correct")
+                if isinstance(correct, bool):
+                    correct = [0] if correct else []
+                if isinstance(correct, int):
+                    correct = [correct]
+                if not isinstance(correct, list):
+                    correct = []
+                qs.append({"prompt": q.get("prompt", ""),
+                           "options": [{"text": o, "is_correct": (k in correct)}
+                                       for k, o in enumerate(opts)]})
+            self.create_exercise(sec_id, key, ["untimed_test", "timed_test"], "/test",
+                                 {"heading": item.get("heading", ""),
+                                  "time_limit_seconds": item.get("time_limit_seconds"),
+                                  "questions": qs})
         elif t == "match":
             pairs = [{"left": l.get("html", ""), "right": item["correct"][l["id"]], "audio_url": ""}
                      for l in item.get("left") or []]
@@ -325,7 +353,7 @@ class MaterialBuilder:
                                  "match": "match pairs", "gap_text": "gaps (typed)",
                                  "short_answer": "short answer", "choice": "quiz (grouped)",
                                  "multi_choice": "quiz (grouped)", "voice": "voice task",
-                                 "true_false": "true/false"}.get(t, t)
+                                 "true_false": "true/false", "test": "quiz"}.get(t, t)
                     extra = ""
                     if m.get("audio"):
                         extra = f" [audio {m['audio']}]"

@@ -2,7 +2,7 @@ from setuptools import setup, find_namespace_packages
 
 setup(
     name="cli-anything-langlisto",
-    version="1.0.2",
+    version="1.0.3",
     description="Unofficial CLI for the LangListo teacher workspace: students, classes, schedule, materials and books",
     author="Fedor Molodtsov",
     url="https://github.com/itsfedor/cli-anything-langlisto",
