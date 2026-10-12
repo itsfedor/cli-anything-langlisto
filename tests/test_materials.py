@@ -54,6 +54,9 @@ class FakeApi:
     def upload(self, path, kind="auto"):
         return "https://cdn.example/" + os.path.basename(path)
 
+    def unit_sections(self, uid):
+        return []
+
 
 SPEC = {
     "lesson_title": "Smoke lesson",
@@ -218,3 +221,16 @@ def test_true_false_not_stated_answers():
     body = tf[3]
     assert [s["answer"] for s in body["statements"]] == ["true", "false", "not_stated"]
     assert body["not_stated_enabled"] is True
+
+
+def test_adoption_of_existing_title_logs_warning():
+    api = FakeApi()
+    api.course_lessons = lambda cid: [{"id": "lesson-9", "title": "Smoke lesson"}]
+    api.unit_sections = lambda uid: [{"id": "sec-a"}, {"id": "sec-b"}]
+    logs = []
+    with tempfile.TemporaryDirectory() as d:
+        res = build_material(api, SPEC, state_path=os.path.join(d, "st.json"), pace=0,
+                             spec_dir=d, log=logs.append)
+    assert res["exercises"] > 0
+    joined = " ".join(logs)
+    assert "adopting" in joined and "2 sections" in joined

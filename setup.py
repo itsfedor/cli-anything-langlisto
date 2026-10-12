@@ -8,7 +8,7 @@ _long = (_here / "README.md").read_text(encoding="utf-8")
 
 setup(
     name="cli-langlisto",
-    version="1.1.1",
+    version="1.1.2",
     description="Unofficial CLI for the LangListo teacher workspace: students, classes, schedule, materials and books",
     long_description=_long,
     long_description_content_type="text/markdown",

@@ -134,7 +134,14 @@ class MaterialBuilder:
                     break
             if hit:
                 self.state["lesson_id"] = hit["id"]
-                self.log(f"= lesson exists: {self.lesson_title} ({hit['id'][:8]})")
+                try:
+                    _secs = self.api.unit_sections(hit["id"]) or []
+                except Exception:
+                    _secs = []
+                self.log(f"= lesson exists: {self.lesson_title} ({hit['id'][:8]}) — adopting it"
+                         + (f"; it already has {len(_secs)} sections — if another spec shares "
+                            "this lesson title you will get duplicated sections; keep lesson "
+                            "titles unique" if _secs else ""))
             else:
                 l = self.api.course_add_lesson(cid)
                 self._sleep()

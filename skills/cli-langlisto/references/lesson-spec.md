@@ -18,6 +18,10 @@ re-run the same command to continue).
 ```
 
 - `lesson_title` — the lesson (unit) name; created if missing in the course.
+  Keep it **unique within a course**: when the state file is missing, a build
+  ADOPTS an existing lesson with the same title (crash recovery) — so two specs
+  sharing one title silently merge into a single lesson with duplicated
+  sections. Disambiguate sibling variants, e.g. `"... (B1+)"`.
 - `course` — course title or id (a book on the Materials shelf; created if
   missing). `--course` on the CLI overrides it.
 - `sections[].id` — your stable id (used for resume); `title` is shown to
@@ -85,3 +89,7 @@ platform's own storage and the returned URL is saved into the state file.
 - Re-running a build NEVER duplicates: already-created sections/exercises are
   looked up in the state file and skipped. To rebuild one item, remove its id
   from the state file first (or delete the exercise in the platform UI).
+- A build whose state file is missing but whose `lesson_title` already exists
+  in the course will ADOPT that lesson and append its own sections to it
+  (safe for crash resumes — but if two specs share a title you get duplicated
+  sections; the build log prints an "adopting it" note). Keep titles unique.
